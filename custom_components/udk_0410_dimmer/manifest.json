@@ -1,9 +1,9 @@
 {
   "domain": "udk_0410_dimmer",
   "name": "UDK-04-10 Dimmer (RS-485/DMX)",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "documentation": "https://github.com/cnc-lasercraft/udk_0410_dimmer",
-  "issue_tracker": "https://github.com/cnc-lasercraft/<REPO>/udk_0410_dimmer",
+  "issue_tracker": "https://github.com/cnc-lasercraft/udk_0410_dimmer/issues",
   "codeowners": ["@cnc-lasercraft"],
   "dependencies": [],
   "requirements": [],
