@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add UDK RS-485 bus",
+        "description": "Create ONE bus (port + baudrate). Then add modules (addresses) via the options.",
+        "data": {
+          "port": "Serial port",
+          "baudrate": "Baudrate"
+        }
+      }
+    },
+    "error": {
+      "address_exists": "This module address already exists."
+    },
+    "abort": {
+      "no_modules": "There are no modules."
+    }
+  },
+  "options": {
+    "step": {
+      "add_module": {
+        "title": "Add module",
+        "description": "One UDK-04-10 module always has 4 channels. Address must be unique.",
+        "data": {
+          "name": "Module name (e.g. M01)",
+          "address": "Module address",
+          "ch1_name": "Channel 1 name",
+          "ch2_name": "Channel 2 name",
+          "ch3_name": "Channel 3 name",
+          "ch4_name": "Channel 4 name"
+        }
+      },
+      "remove_module": {
+        "title": "Remove module",
+        "description": "Select the module to remove."
+      }
+    }
+  }
+}
