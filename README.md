@@ -1,134 +1,169 @@
-# UDK-04-10 Dimmer – Home Assistant Integration
+# HA UDK-0410 Dimmer (RS485)
 
-Integration for .
-HA UDK-0410 Dimmer (RS485)
+![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-blue)
 
-A Home Assistant custom integration for the **SE Lightmanagement AG** dimmer module **UDK-04-10** (RS-485/DMX) (4 channels per module).
+Home Assistant custom integration for the **UDK-0410 RS485 dimmer modules** (4 channels per module).
 
-This integration creates one Light entity per dimmer channel and supports:
+This integration creates **one Light entity per channel** and supports:
+- Brightness control
+- Transitions
+- Reliable ACK-based communication
+- Full UI setup via Config Flow (no YAML required)
 
-Brightness control
+---
 
-Transitions
+## 📸 Screenshots
 
-Reliable ACK handling
+Add your screenshots here:
 
-Full UI setup via Config Flow (no YAML required)
+- `docs/setup.png`
+- `docs/modules.png`
 
-✨ Features
+<p float="left">
+  <img src="docs/setup.png" width="48%" />
+  <img src="docs/modules.png" width="48%" />
+</p>
 
-✅ Supports multi-module setups (each module = 4 dimmers)
+---
 
-✅ All modules share one RS485 serial bus
+## ✨ Features
 
-✅ One Light entity per channel
+- ✅ Multi-module support (each module = 4 dimmer channels)
+- ✅ All modules share the same RS485 serial bus
+- ✅ One `light` entity per channel
+- ✅ Brightness + transitions supported
+- ✅ ACK handling for more reliable control
+- ✅ Easy setup via Home Assistant UI
 
-✅ Brightness + transition support
+---
 
-✅ ACK-based sending (more reliable than fire-and-forget)
+## 🚀 Quick Start
 
-✅ Easy setup via Home Assistant UI
+1. Install the integration (HACS or manual)
+2. Restart Home Assistant
+3. Add the integration in the UI
+4. Configure your modules and channel names
 
-📦 Installation
-Option A — HACS (recommended)
+---
 
-Open HACS → Integrations
+## 📦 Installation
 
-Menu (⋮) → Custom repositories
+### Option A — HACS (recommended)
 
-Add your GitHub repo URL
+1. Open **HACS → Integrations**
+2. Menu (⋮) → **Custom repositories**
+3. Add your GitHub repo URL
+4. Category: **Integration**
+5. Install **HA UDK-0410 Dimmer**
+6. Restart Home Assistant
 
-Category: Integration
+---
 
-Install HA UDK-0410 Dimmer
-
-Restart Home Assistant
-
-Option B — Manual install
+### Option B — Manual
 
 Copy:
 
+```
 custom_components/ha_udk_0410_dimmer
-
+```
 
 to:
 
+```
 /config/custom_components/
-
+```
 
 Restart Home Assistant.
 
-⚙️ Setup (UI)
+---
+
+## ⚙️ Setup (UI)
 
 Go to:
-Settings → Devices & Services → Add Integration
+
+**Settings → Devices & Services → Add Integration**
 
 Search for:
-HA UDK-0410 Dimmer
 
-Enter:
+**HA UDK-0410 Dimmer**
 
-Serial port (example: /dev/ttyUSB0)
+Then enter your serial settings.
 
-Baudrate (default: 38400)
+### Serial settings
 
-After setup, click Configure to add modules.
+| Setting | Default | Example |
+|--------|---------|---------|
+| Port | — | `/dev/ttyUSB0` |
+| Baudrate | `38400` | `38400` |
 
-🧩 Adding Modules
+---
 
-Each module contains 4 dimmer channels.
+## 🧩 Adding Modules
 
-In the module configuration you enter:
+Each module contains **4 dimmer channels**.
 
-Module name (example: M01)
+In the configuration you enter:
 
-RS485 address (example: 1)
+- Module name (example: `M01`)
+- RS485 address (example: `1`)
+- Channel 1 name
+- Channel 2 name
+- Channel 3 name
+- Channel 4 name
 
-Channel 1 name
+After pressing **Submit**, entities are created immediately.
 
-Channel 2 name
+---
 
-Channel 3 name
+## 🏷️ Entities
 
-Channel 4 name
+Each channel is exposed as a Home Assistant `light` entity.
 
-After pressing Submit, the entities are created immediately.
+Supported features:
 
-🏷️ Entities
+- Brightness
+- Transition
 
-Each channel is exposed as a Home Assistant light entity:
+---
 
-Supports brightness
-
-Supports transitions
-
-🪵 Logging
+## 🪵 Logging
 
 Default logging includes important startup information.
 
-To enable debug logs, add to configuration.yaml:
+To enable debug logging:
 
+```yaml
 logger:
   default: info
   logs:
     custom_components.ha_udk_0410_dimmer: debug
+```
 
-🛠️ Troubleshooting
-Entities don’t appear after adding a module
+---
 
-Restart Home Assistant once after updating the integration
+## 🛠️ Troubleshooting
 
-Check logs under:
-custom_components.ha_udk_0410_dimmer
+### Entities don’t appear after adding a module
 
-Serial connection issues
+- Restart Home Assistant once after updating the integration
+- Check logs for: `custom_components.ha_udk_0410_dimmer`
+
+### Serial connection issues
 
 Make sure your serial port exists, for example:
 
-/dev/ttyUSB0
+- `/dev/ttyUSB0`
+- `/dev/serial/by-id/...`
 
-/dev/serial/by-id/...
+---
 
-📄 License
+## 📄 License
 
 MIT License (recommended)
+
+---
+
+## 🧑‍💻 Development / Contributing
+
+Bug reports and PRs are welcome.
