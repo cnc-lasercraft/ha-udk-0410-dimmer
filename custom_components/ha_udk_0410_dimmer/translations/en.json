@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA UDK-0410 Dimmer",
+        "description": "Configure the RS485 serial connection.",
+        "data": {
+          "port": "Serial port",
+          "baudrate": "Baudrate"
+        }
+      }
+    },
+    "error": {
+      "address_exists": "This module address already exists."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HA UDK-0410 Dimmer options",
+        "menu_options": {
+          "add_module": "Add module",
+          "edit_module": "Edit module",
+          "remove_module": "Remove module"
+        }
+      },
+      "add_module": {
+        "title": "Add module",
+        "data": {
+          "address": "Address",
+          "name": "Module name",
+          "d1": "Channel 1 name",
+          "d2": "Channel 2 name",
+          "d3": "Channel 3 name",
+          "d4": "Channel 4 name"
+        }
+      },
+      "edit_module": {
+        "title": "Select module",
+        "data": {
+          "module": "Module"
+        }
+      },
+      "edit_module_details": {
+        "title": "Edit module",
+        "data": {
+          "name": "Module name",
+          "d1": "Channel 1 name",
+          "d2": "Channel 2 name",
+          "d3": "Channel 3 name",
+          "d4": "Channel 4 name"
+        }
+      },
+      "remove_module": {
+        "title": "Remove module",
+        "data": {
+          "module": "Module"
+        }
+      }
+    },
+    "error": {
+      "address_exists": "This module address already exists."
+    }
+  }
+}
