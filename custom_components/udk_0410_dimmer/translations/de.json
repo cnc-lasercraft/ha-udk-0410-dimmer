@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "UDK RS-485 Bus hinzufügen",
-        "description": "Du erstellst EINEN Bus (Port + Baudrate). Danach fügst du in den Optionen die Module (Adressen) hinzu.",
+        "title": "HA UDK-0410 Dimmer",
+        "description": "Konfiguriere die serielle RS485-Verbindung.",
         "data": {
           "port": "Serieller Port",
           "baudrate": "Baudrate"
@@ -12,29 +12,54 @@
     },
     "error": {
       "address_exists": "Diese Modul-Adresse existiert bereits."
-    },
-    "abort": {
-      "no_modules": "Es sind keine Module vorhanden."
     }
   },
   "options": {
     "step": {
+      "init": {
+        "title": "HA UDK-0410 Dimmer Optionen",
+        "menu_options": {
+          "add_module": "Modul hinzufügen",
+          "edit_module": "Modul bearbeiten",
+          "remove_module": "Modul entfernen"
+        }
+      },
       "add_module": {
         "title": "Modul hinzufügen",
-        "description": "Ein UDK-04-10 Modul hat immer 4 Kanäle. Adresse muss eindeutig sein.",
         "data": {
-          "name": "Modul-Name (z.B. M01)",
-          "address": "Modul-Adresse",
-          "ch1_name": "Kanal 1 Name",
-          "ch2_name": "Kanal 2 Name",
-          "ch3_name": "Kanal 3 Name",
-          "ch4_name": "Kanal 4 Name"
+          "address": "Adresse",
+          "name": "Modulname",
+          "d1": "Kanal 1 Name",
+          "d2": "Kanal 2 Name",
+          "d3": "Kanal 3 Name",
+          "d4": "Kanal 4 Name"
+        }
+      },
+      "edit_module": {
+        "title": "Modul auswählen",
+        "data": {
+          "module": "Modul"
+        }
+      },
+      "edit_module_details": {
+        "title": "Modul bearbeiten",
+        "data": {
+          "name": "Modulname",
+          "d1": "Kanal 1 Name",
+          "d2": "Kanal 2 Name",
+          "d3": "Kanal 3 Name",
+          "d4": "Kanal 4 Name"
         }
       },
       "remove_module": {
         "title": "Modul entfernen",
-        "description": "Wähle ein Modul aus, das entfernt werden soll."
+        "data": {
+          "module": "Modul"
+        }
       }
+    },
+    "error": {
+      "address_exists": "Diese Modul-Adresse existiert bereits."
     }
   }
 }
