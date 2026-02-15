@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add UDK RS-485 bus",
-        "description": "Create ONE bus (port + baudrate). Then add modules (addresses) via the options.",
+        "title": "HA UDK-0410 Dimmer",
+        "description": "Configure the RS485 serial connection.",
         "data": {
           "port": "Serial port",
           "baudrate": "Baudrate"
@@ -12,29 +12,54 @@
     },
     "error": {
       "address_exists": "This module address already exists."
-    },
-    "abort": {
-      "no_modules": "There are no modules."
     }
   },
   "options": {
     "step": {
+      "init": {
+        "title": "HA UDK-0410 Dimmer options",
+        "menu_options": {
+          "add_module": "Add module",
+          "edit_module": "Edit module",
+          "remove_module": "Remove module"
+        }
+      },
       "add_module": {
         "title": "Add module",
-        "description": "One UDK-04-10 module always has 4 channels. Address must be unique.",
         "data": {
-          "name": "Module name (e.g. M01)",
-          "address": "Module address",
-          "ch1_name": "Channel 1 name",
-          "ch2_name": "Channel 2 name",
-          "ch3_name": "Channel 3 name",
-          "ch4_name": "Channel 4 name"
+          "address": "Address",
+          "name": "Module name",
+          "d1": "Channel 1 name",
+          "d2": "Channel 2 name",
+          "d3": "Channel 3 name",
+          "d4": "Channel 4 name"
+        }
+      },
+      "edit_module": {
+        "title": "Select module",
+        "data": {
+          "module": "Module"
+        }
+      },
+      "edit_module_details": {
+        "title": "Edit module",
+        "data": {
+          "name": "Module name",
+          "d1": "Channel 1 name",
+          "d2": "Channel 2 name",
+          "d3": "Channel 3 name",
+          "d4": "Channel 4 name"
         }
       },
       "remove_module": {
         "title": "Remove module",
-        "description": "Select the module to remove."
+        "data": {
+          "module": "Module"
+        }
       }
+    },
+    "error": {
+      "address_exists": "This module address already exists."
     }
   }
 }
