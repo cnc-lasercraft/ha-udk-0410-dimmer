@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-DOMAIN = "udk_0410_dimmer"
+DOMAIN = "ha_udk_0410_dimmer"
 
 CONF_PORT = "port"
 CONF_BAUDRATE = "baudrate"
