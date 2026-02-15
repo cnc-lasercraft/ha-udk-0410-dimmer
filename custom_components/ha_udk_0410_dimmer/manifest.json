@@ -1,0 +1,14 @@
+{
+  "domain": "ha_udk_0410_dimmer",
+  "name": "UDK-04-10 Dimmer (RS-485/DMX)",
+  "version": "0.0.1",
+  "documentation": "https://github.com/cnc-lasercraft/udk_0410_dimmer",
+  "issue_tracker": "https://github.com/cnc-lasercraft/udk_0410_dimmer/issues",
+  "codeowners": ["@cnc-lasercraft"],
+  "dependencies": [],
+  "requirements": [
+    "pyserial-asyncio==0.6"
+  ],
+  "iot_class": "local_polling",
+  "config_flow": true
+}
