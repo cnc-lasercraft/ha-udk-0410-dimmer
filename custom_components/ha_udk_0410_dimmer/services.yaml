@@ -1,0 +1,65 @@
+update_module:
+  name: Update module
+  description: Update a module or dimmer channel name.
+  fields:
+    address:
+      name: Address
+      description: RS-485 module address (1–247).
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 247
+          mode: box
+    key:
+      name: Key
+      description: Property to update — "name" for the module name, or "d1"–"d4" for dimmer channel names.
+      required: true
+      example: "d1"
+      selector:
+        text:
+    value:
+      name: Value
+      description: New value for the property.
+      required: true
+      example: "Wohnzimmer"
+      selector:
+        text:
+
+add_module:
+  name: Add module
+  description: Add a new dimmer module. Creates 4 dimmer channels and reloads the integration.
+  fields:
+    address:
+      name: Address
+      description: RS-485 module address (1–247). Must be unique.
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 247
+          mode: box
+    name:
+      name: Name
+      description: Module name. Defaults to "M01", "M02", etc.
+      required: false
+      example: "M01"
+      selector:
+        text:
+
+remove_module:
+  name: Remove module
+  description: Remove a dimmer module and its 4 channels. Reloads the integration.
+  fields:
+    address:
+      name: Address
+      description: RS-485 module address of the module to remove.
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 247
+          mode: box

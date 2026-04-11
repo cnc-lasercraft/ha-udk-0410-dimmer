@@ -101,10 +101,10 @@ class Rs485DimmerOptionsFlowHandler(config_entries.OptionsFlow):
                     selector.NumberSelectorConfig(min=1, max=247, step=1, mode=selector.NumberSelectorMode.BOX)
                 ),
                 vol.Required(MOD_NAME, default="M01"): selector.TextSelector(),
-                vol.Required("d1", default="Kanal 1"): selector.TextSelector(),
-                vol.Required("d2", default="Kanal 2"): selector.TextSelector(),
-                vol.Required("d3", default="Kanal 3"): selector.TextSelector(),
-                vol.Required("d4", default="Kanal 4"): selector.TextSelector(),
+                vol.Required("d1", default="Dimmer 1"): selector.TextSelector(),
+                vol.Required("d2", default="Dimmer 2"): selector.TextSelector(),
+                vol.Required("d3", default="Dimmer 3"): selector.TextSelector(),
+                vol.Required("d4", default="Dimmer 4"): selector.TextSelector(),
             }
         )
 
@@ -142,25 +142,25 @@ class Rs485DimmerOptionsFlowHandler(config_entries.OptionsFlow):
             dimmers = module.get(MOD_DIMMERS, [])
             # Ensure list length 4
             while len(dimmers) < 4:
-                dimmers.append({"index": len(dimmers) + 1, "name": f"Kanal {len(dimmers) + 1}"})
+                dimmers.append({"index": len(dimmers) + 1, "name": f"Dimmer {len(dimmers) + 1}"})
             for i in range(4):
                 key = f"d{i+1}"
                 dimmers[i]["index"] = i + 1
-                dimmers[i]["name"] = user_input.get(key, dimmers[i].get("name", f"Kanal {i+1}")).strip() or f"Kanal {i+1}"
+                dimmers[i]["name"] = user_input.get(key, dimmers[i].get("name", f"Dimmer {i+1}")).strip() or f"Dimmer {i+1}"
             module[MOD_DIMMERS] = dimmers[:4]
             return await self._save_and_exit()
 
         dimmers = module.get(MOD_DIMMERS, [])
         while len(dimmers) < 4:
-            dimmers.append({"index": len(dimmers) + 1, "name": f"Kanal {len(dimmers) + 1}"})
+            dimmers.append({"index": len(dimmers) + 1, "name": f"Dimmer {len(dimmers) + 1}"})
 
         schema = vol.Schema(
             {
                 vol.Required(MOD_NAME, default=module.get(MOD_NAME, f"M{module[MOD_ADDRESS]:02d}")): selector.TextSelector(),
-                vol.Required("d1", default=dimmers[0].get("name", "Kanal 1")): selector.TextSelector(),
-                vol.Required("d2", default=dimmers[1].get("name", "Kanal 2")): selector.TextSelector(),
-                vol.Required("d3", default=dimmers[2].get("name", "Kanal 3")): selector.TextSelector(),
-                vol.Required("d4", default=dimmers[3].get("name", "Kanal 4")): selector.TextSelector(),
+                vol.Required("d1", default=dimmers[0].get("name", "Dimmer 1")): selector.TextSelector(),
+                vol.Required("d2", default=dimmers[1].get("name", "Dimmer 2")): selector.TextSelector(),
+                vol.Required("d3", default=dimmers[2].get("name", "Dimmer 3")): selector.TextSelector(),
+                vol.Required("d4", default=dimmers[3].get("name", "Dimmer 4")): selector.TextSelector(),
             }
         )
 
