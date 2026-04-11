@@ -143,7 +143,7 @@ class UdkDimmerCard extends HTMLElement {
           <th>Adr</th><th>Modul</th><th>Dimmer 1</th><th>Dimmer 2</th><th>Dimmer 3</th><th>Dimmer 4</th><th></th>
         </tr></thead><tbody>${rows}${addRow}</tbody></table>
         ${this._showAdd ? '' : '<button class="add" id="btn-add">+ Modul hinzufügen</button>'}
-        <div class="foot">${modules.length} Module · ${modules.length * 4} Dimmer · Änderungen werden sofort gespeichert</div>
+        <div class="foot">${modules.length} Module · ${modules.length * 4} Dimmer · Änderungen werden sofort gespeichert<br>Umbenennen ändert nur den Anzeigenamen — Entity-IDs und Automationen bleiben unverändert.</div>
       </ha-card>`;
 
     this._bindEvents();

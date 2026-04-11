@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -55,12 +56,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         value = call.data.get("value")
         if address < 1 or not key:
             return
-        modules = list(entry.options.get(CONF_MODULES, []))
+        modules = copy.deepcopy(list(entry.options.get(CONF_MODULES, [])))
         for m in modules:
             if int(m.get("address", 0)) == address:
                 if key.startswith("d") and key[1:].isdigit():
                     idx = int(key[1:]) - 1
-                    dimmers = list(m.get("dimmers", []))
+                    dimmers = m.get("dimmers", [])
                     while len(dimmers) <= idx:
                         dimmers.append({"index": len(dimmers) + 1, "name": ""})
                     dimmers[idx]["name"] = str(value or "")
@@ -77,7 +78,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         name = str(call.data.get("name", "")).strip()
         if address < 1:
             return
-        modules = list(entry.options.get(CONF_MODULES, []))
+        modules = copy.deepcopy(list(entry.options.get(CONF_MODULES, [])))
         if any(int(m.get("address", 0)) == address for m in modules):
             return
         if not name:
@@ -95,7 +96,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         address = int(call.data.get("address", 0))
         if address < 1:
             return
-        modules = list(entry.options.get(CONF_MODULES, []))
+        modules = copy.deepcopy(list(entry.options.get(CONF_MODULES, [])))
         modules = [m for m in modules if int(m.get("address", 0)) != address]
         new_options = dict(entry.options)
         new_options[CONF_MODULES] = modules

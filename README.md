@@ -81,6 +81,9 @@ For each module you configure:
 - Module name (e.g. `M01`)
 - Channel names (Dimmer 1–4)
 
+> **Note:** Renaming modules or channels only changes the display name (`friendly_name`).
+> The `entity_id` (e.g. `light.m01d1_sw_garagenplatz`) stays the same — automations and scenes are not affected.
+
 ---
 
 ## Custom Card

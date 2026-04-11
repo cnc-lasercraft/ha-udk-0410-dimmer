@@ -6,6 +6,11 @@ Robust ACK handling:
 - structured debug logs (sent hex, received hex, buffer lengths, timeouts, retries)
 
 ACK frame expected (4 bytes): FE <module_address> 06 FF
+
+Status polling (command 0x53):
+- queries all 4 channels of a module in one frame
+- response (12 bytes): FE <addr> 53 <level1> <status1> ... <level4> <status4> FF
+- cached per module to avoid redundant bus traffic
 """
 
 from __future__ import annotations
@@ -158,8 +163,9 @@ class Rs485Dimmer(LightEntity):
     START_BYTE = 0xFE
     STOP_BYTE = 0xFF
     CMD_SET = 0x57
+    CMD_STATUS = 0x53
 
-    def __init__(self, hass, name: str, module: Rs485Module, module_address: int, dimmer_index: int):
+    def __init__(self, hass, name: str, module: Rs485Module, module_address: int, dimmer_index: int, entry_id: str):
         self.hass = hass
         self._name = name
         self.module = module
@@ -169,6 +175,14 @@ class Rs485Dimmer(LightEntity):
         self._brightness = 0
         self._attr_supported_color_modes = {ColorMode.BRIGHTNESS}
         self._unique_id: str | None = None
+        self._status_bits: int | None = None
+        self._last_command_time: float = 0.0
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry_id)},
+            "name": "UDK-04-10 Dimmer",
+            "manufacturer": "UDK",
+            "model": "UDK-04-10",
+        }
 
     @property
     def name(self):
@@ -288,6 +302,7 @@ class Rs485Dimmer(LightEntity):
             read_chunk_timeout=0.12,
         )
 
+        self._last_command_time = time.monotonic()
         if success:
             self._is_on = True
             self._brightness = level
@@ -326,6 +341,7 @@ class Rs485Dimmer(LightEntity):
             read_chunk_timeout=0.12,
         )
 
+        self._last_command_time = time.monotonic()
         if not success:
             _LOGGER.warning("RS485Dimmer[%s]: Ausschalten nicht bestätigt (kein ACK).", self._name)
             return
@@ -333,6 +349,114 @@ class Rs485Dimmer(LightEntity):
         self._is_on = False
         self._brightness = 0
         self.async_schedule_update_ha_state()
+
+    # --- Status polling (command 0x53) ---
+
+    def _build_status_query(self) -> bytes:
+        """Build a status query frame for all 4 channels of this module."""
+        data = [0x0F, 0x00]  # 0x0F = all 4 channels (bitmask), 0x00 = reserved
+        checksum = (self.module_address + self.CMD_STATUS + data[0] + data[1]) & 0xFF & 0x7F
+        return bytes(
+            [self.SYNC_BYTE, self.START_BYTE, self.module_address, self.CMD_STATUS]
+            + data
+            + [checksum, self.STOP_BYTE]
+        )
+
+    def _parse_status_response(self, buf: bytes) -> bytes | None:
+        """Extract 8 data bytes from a status response in the buffer.
+
+        Response format (12 bytes): FE <addr> 53 <D0..D7> FF
+        D0/D2/D4/D6 = level, D1/D3/D5/D7 = status bits per channel.
+        """
+        prefix = bytes([self.START_BYTE, self.module_address, self.CMD_STATUS])
+        if prefix not in buf:
+            return None
+        idx = buf.index(prefix)
+        # Need prefix(3) + data(8) + end(1) = 12 bytes
+        if idx + 12 > len(buf):
+            return None
+        if buf[idx + 11] != 0xFF:
+            return None
+        return buf[idx + 3 : idx + 11]
+
+    def _apply_status(self, data: bytes) -> None:
+        """Update brightness, on/off state and status bits from polled data."""
+        if len(data) < 8:
+            return
+        ch = max(0, min(3, self.dimmer_index - 1))
+        level = data[ch * 2]
+        status = data[ch * 2 + 1]
+        self._brightness = level
+        self._is_on = level > 0
+        self._status_bits = status
+
+    async def async_update(self) -> None:
+        """Poll the module for current levels and status (called by HA)."""
+        # Don't poll right after a set command — dimmer may be in transition
+        if time.monotonic() - self._last_command_time < 5.0:
+            return
+
+        # Per-module cache so 4 entities share one query instead of 4
+        cache_key = f"{DOMAIN}_status_{self.module_address}"
+        cache = self.hass.data.get(cache_key)
+        now = time.monotonic()
+
+        # Use cache if fresh (only one entity per module actually polls per cycle)
+        if cache and (now - cache["poll_time"]) < 20.0:
+            self._apply_status(cache["data"])
+            return
+
+        # This entity does the actual poll for this module this cycle
+        message = self._build_status_query()
+        prefix = bytes([self.START_BYTE, self.module_address, self.CMD_STATUS])
+
+        buf, matched = await self.module.send_and_wait_for(
+            message,
+            patterns=[prefix],
+            timeout_total=0.8,
+            read_chunk_timeout=0.12,
+        )
+
+        if matched:
+            data = self._parse_status_response(buf)
+            if data:
+                self.hass.data[cache_key] = {"poll_time": now, "data": data}
+                self._apply_status(data)
+                _LOGGER.debug(
+                    "RS485Dimmer[%s]: Status OK (addr=%d): %s",
+                    self._name,
+                    self.module_address,
+                    binascii.hexlify(data).decode(),
+                )
+                return
+
+        # Poll failed — mark as polled (don't retry this cycle) and use old data
+        if cache:
+            cache["poll_time"] = now
+            self._apply_status(cache["data"])
+        else:
+            # No data yet — create empty poll marker so other entities don't retry
+            self.hass.data[cache_key] = {"poll_time": now, "data": None}
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Expose hardware status bits and addressing as entity attributes."""
+        attrs: dict = {
+            "module_address": self.module_address,
+            "dimmer_index": self.dimmer_index,
+        }
+        if self._status_bits is not None:
+            s = self._status_bits
+            attrs.update({
+                "emergency_stop": bool(s & 0x01),
+                "overtemperature": bool(s & 0x02),
+                "offline": bool(s & 0x04),
+                "overcurrent": bool(s & 0x08),
+                "phase_mode": "trailing_edge" if (s & 0x10) else "leading_edge",
+                "grid_frequency": "60Hz" if (s & 0x20) else "50Hz",
+                "load_error": bool(s & 0x40),
+            })
+        return attrs
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
@@ -380,6 +504,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 module_obj,
                 module_address=module_addr,
                 dimmer_index=dimmer_index,
+                entry_id=entry.entry_id,
             )
             unique_id = f"ha_udk_0410_dimmer_{module_addr}_{dimmer_index}"
             entity.unique_id = unique_id
