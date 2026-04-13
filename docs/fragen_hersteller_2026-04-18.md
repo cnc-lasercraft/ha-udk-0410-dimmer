@@ -23,3 +23,5 @@
 8. **Firmware-Versionen** — Gibt es unterschiedliche Firmware-Stände im Feld? Unterschiede im Protokoll-Support (z.B. 0x53 nicht bei allen)?
 
 9. **Weitere RS-485 Produkte** — Gibt es andere Geräte (Schaltaktoren, Sensoren) mit dem gleichen Protokoll die man anbinden könnte?
+
+10. **Logo-Nutzung** — Dürfen wir das varintens/se-Lightmanagement-Logo als Icon für die Integration verwenden? (Aktuell "icon not available" in HA)
