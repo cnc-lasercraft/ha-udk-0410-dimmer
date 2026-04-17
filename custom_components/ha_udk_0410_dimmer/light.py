@@ -379,9 +379,9 @@ class Rs485Dimmer(LightEntity):
             return None
         return buf[idx + 3 : idx + 11]
 
-    def _apply_status(self, data: bytes) -> None:
+    def _apply_status(self, data: bytes | None) -> None:
         """Update brightness, on/off state and status bits from polled data."""
-        if len(data) < 8:
+        if data is None or len(data) < 8:
             return
         ch = max(0, min(3, self.dimmer_index - 1))
         level = data[ch * 2]
