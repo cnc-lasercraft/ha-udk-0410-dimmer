@@ -91,8 +91,15 @@ class Rs485Module:
         read_chunk_timeout: float = 0.12,
         max_buffer: int = 4096,
         flush_before_send: bool = True,
+        min_frame_len: int = 0,
     ) -> Tuple[bytes, Optional[bytes]]:
-        """Send a message and read until one of the patterns appears or timeout."""
+        """Send a message and read until one of the patterns appears or timeout.
+
+        ``min_frame_len`` requires that, after a pattern is found at index ``idx``,
+        the buffer also contains at least ``min_frame_len`` bytes counted from
+        ``idx`` before returning. Used for multi-byte frames where the pattern is
+        only the prefix (e.g. status response: 3-byte prefix, 12-byte total frame).
+        """
         if self._writer is None or self._reader is None:
             _LOGGER.warning("RS485: Verbindung nicht hergestellt (port %s)", self.port)
             return b"", None
@@ -132,13 +139,23 @@ class Rs485Module:
 
                     for p in patterns:
                         if p in buf:
+                            idx = buf.index(p)
+                            needed = max(len(p), min_frame_len)
+                            if len(buf) - idx >= needed:
+                                _LOGGER.debug(
+                                    "RS485: Match gefunden (%s) im Buffer (%d bytes): %s",
+                                    binascii.hexlify(p).decode(),
+                                    len(buf),
+                                    binascii.hexlify(buf).decode(),
+                                )
+                                return bytes(buf), p
                             _LOGGER.debug(
-                                "RS485: Match gefunden (%s) im Buffer (%d bytes): %s",
+                                "RS485: Pattern (%s) bei idx=%d, BufLen=%d, brauche %d — warte auf Rest",
                                 binascii.hexlify(p).decode(),
+                                idx,
                                 len(buf),
-                                binascii.hexlify(buf).decode(),
+                                idx + needed,
                             )
-                            return bytes(buf), p
 
                     _LOGGER.debug(
                         "RS485: Chunk %d bytes, Buffer %d bytes: %s",
@@ -415,6 +432,7 @@ class Rs485Dimmer(LightEntity):
             patterns=[prefix],
             timeout_total=0.8,
             read_chunk_timeout=0.12,
+            min_frame_len=12,
         )
 
         if matched:
@@ -430,12 +448,19 @@ class Rs485Dimmer(LightEntity):
                 )
                 return
 
-        # Poll failed — mark as polled (don't retry this cycle) and use old data
+        # Poll failed — mark as polled so sibling entities skip this cycle, but
+        # keep the current HA state. Do NOT apply stale cache data: that caused
+        # phantom on/off jumps when an old cache outlived the real state.
+        _LOGGER.debug(
+            "RS485Dimmer[%s]: Poll fehlgeschlagen (addr=%d) — State unverändert (BufLen=%d matched=%s)",
+            self._name,
+            self.module_address,
+            len(buf),
+            matched is not None,
+        )
         if cache:
             cache["poll_time"] = now
-            self._apply_status(cache["data"])
         else:
-            # No data yet — create empty poll marker so other entities don't retry
             self.hass.data[cache_key] = {"poll_time": now, "data": None}
 
     @property
