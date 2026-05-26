@@ -415,53 +415,63 @@ class Rs485Dimmer(LightEntity):
 
         # Per-module cache so 4 entities share one query instead of 4
         cache_key = f"{DOMAIN}_status_{self.module_address}"
+        poll_lock_key = f"{DOMAIN}_polllock_{self.module_address}"
+        poll_lock: asyncio.Lock = self.hass.data.setdefault(poll_lock_key, asyncio.Lock())
+
+        # Fast path: cache fresh, no need to take the per-module lock
         cache = self.hass.data.get(cache_key)
         now = time.monotonic()
-
-        # Use cache if fresh (only one entity per module actually polls per cycle)
         if cache and (now - cache["poll_time"]) < 20.0:
             self._apply_status(cache["data"])
             return
 
-        # This entity does the actual poll for this module this cycle
-        message = self._build_status_query()
-        prefix = bytes([self.START_BYTE, self.module_address, self.CMD_STATUS])
-
-        buf, matched = await self.module.send_and_wait_for(
-            message,
-            patterns=[prefix],
-            timeout_total=0.8,
-            read_chunk_timeout=0.12,
-            min_frame_len=12,
-        )
-
-        if matched:
-            data = self._parse_status_response(buf)
-            if data:
-                self.hass.data[cache_key] = {"poll_time": now, "data": data}
-                self._apply_status(data)
-                _LOGGER.debug(
-                    "RS485Dimmer[%s]: Status OK (addr=%d): %s",
-                    self._name,
-                    self.module_address,
-                    binascii.hexlify(data).decode(),
-                )
+        # Serialize the actual poll per module so siblings don't re-query
+        async with poll_lock:
+            # Re-check after acquiring the lock — a sibling may have just polled
+            cache = self.hass.data.get(cache_key)
+            now = time.monotonic()
+            if cache and (now - cache["poll_time"]) < 20.0:
+                self._apply_status(cache["data"])
                 return
 
-        # Poll failed — mark as polled so sibling entities skip this cycle, but
-        # keep the current HA state. Do NOT apply stale cache data: that caused
-        # phantom on/off jumps when an old cache outlived the real state.
-        _LOGGER.debug(
-            "RS485Dimmer[%s]: Poll fehlgeschlagen (addr=%d) — State unverändert (BufLen=%d matched=%s)",
-            self._name,
-            self.module_address,
-            len(buf),
-            matched is not None,
-        )
-        if cache:
-            cache["poll_time"] = now
-        else:
-            self.hass.data[cache_key] = {"poll_time": now, "data": None}
+            message = self._build_status_query()
+            prefix = bytes([self.START_BYTE, self.module_address, self.CMD_STATUS])
+
+            buf, matched = await self.module.send_and_wait_for(
+                message,
+                patterns=[prefix],
+                timeout_total=0.8,
+                read_chunk_timeout=0.12,
+                min_frame_len=12,
+            )
+
+            if matched:
+                data = self._parse_status_response(buf)
+                if data:
+                    self.hass.data[cache_key] = {"poll_time": now, "data": data}
+                    self._apply_status(data)
+                    _LOGGER.debug(
+                        "RS485Dimmer[%s]: Status OK (addr=%d): %s",
+                        self._name,
+                        self.module_address,
+                        binascii.hexlify(data).decode(),
+                    )
+                    return
+
+            # Poll failed — mark as polled so sibling entities skip this cycle, but
+            # keep the current HA state. Do NOT apply stale cache data: that caused
+            # phantom on/off jumps when an old cache outlived the real state.
+            _LOGGER.debug(
+                "RS485Dimmer[%s]: Poll fehlgeschlagen (addr=%d) — State unverändert (BufLen=%d matched=%s)",
+                self._name,
+                self.module_address,
+                len(buf),
+                matched is not None,
+            )
+            if cache:
+                cache["poll_time"] = now
+            else:
+                self.hass.data[cache_key] = {"poll_time": now, "data": None}
 
     @property
     def extra_state_attributes(self) -> dict:
