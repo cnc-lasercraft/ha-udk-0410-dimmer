@@ -81,8 +81,8 @@ class UdkDimmerTechCard extends HTMLElement {
       html += '<div class="module-grid">';
       for (const d of dims) {
         const dimName = d.name.replace(/^M\d+D\d+\s*-\s*/, '');
-        const pct = d.state === 'on' ? Math.round(d.brightness / 255 * 100) : 0;
         const val = d.state === 'on' ? d.brightness : 0;
+        const pct = this._fmtPct(val);
         html += `
           <div class="dimmer-row ${d.state === 'on' ? 'is-on' : ''}" data-eid="${d.entity_id}">
             <div class="dimmer-info">
@@ -90,9 +90,11 @@ class UdkDimmerTechCard extends HTMLElement {
               <span class="dname">${this._esc(dimName)}</span>
             </div>
             <div class="slider-wrap">
+              <button class="step" data-eid="${d.entity_id}" data-dir="-1" title="Feinjustierung −1">−</button>
               <input type="range" min="0" max="255" value="${val}"
                      data-eid="${d.entity_id}" class="slider">
-              <span class="pct">${pct}%</span>
+              <button class="step" data-eid="${d.entity_id}" data-dir="1" title="Feinjustierung +1">+</button>
+              <span class="pct">${pct}</span>
             </div>
             <div class="meta">
               <span class="phase" title="Schaltart">${this._phaseLabel(d.phase_mode)}</span>
@@ -125,7 +127,7 @@ class UdkDimmerTechCard extends HTMLElement {
         .module-grid{padding:4px 0}
         .dimmer-row{
           display:grid;
-          grid-template-columns:240px 200px 1fr;
+          grid-template-columns:240px 260px 1fr;
           align-items:center;
           padding:6px 8px;
           border-bottom:1px solid var(--divider-color,#222);
@@ -138,7 +140,17 @@ class UdkDimmerTechCard extends HTMLElement {
           min-width:24px;
         }
         .dname{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .slider-wrap{display:flex;align-items:center;gap:8px}
+        .slider-wrap{display:flex;align-items:center;gap:6px}
+        .step{
+          width:24px;height:24px;padding:0;flex-shrink:0;
+          border:1px solid var(--divider-color,#444);border-radius:4px;
+          background:var(--card-background-color,transparent);
+          color:var(--primary-text-color);
+          font-size:16px;line-height:1;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;
+        }
+        .step:hover{border-color:var(--primary-color,#03a9f4);color:var(--primary-color,#03a9f4)}
+        .step:active{background:var(--primary-color,#03a9f4)30}
         .slider{
           width:140px;height:6px;-webkit-appearance:none;appearance:none;
           background:var(--divider-color,#444);border-radius:3px;outline:none;
@@ -148,7 +160,7 @@ class UdkDimmerTechCard extends HTMLElement {
           -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
           background:var(--primary-color,#03a9f4);cursor:pointer;border:none;
         }
-        .pct{font-size:13px;min-width:36px;text-align:right;color:var(--secondary-text-color);font-variant-numeric:tabular-nums}
+        .pct{font-size:13px;min-width:46px;text-align:right;color:var(--secondary-text-color);font-variant-numeric:tabular-nums}
         .meta{display:flex;align-items:center;gap:10px;font-size:12px}
         .phase{
           padding:2px 6px;border-radius:3px;
@@ -219,9 +231,8 @@ class UdkDimmerTechCard extends HTMLElement {
         const slider = row.querySelector('.slider');
         const pctEl = row.querySelector('.pct');
         const val = d.state === 'on' ? d.brightness : 0;
-        const pct = d.state === 'on' ? Math.round(d.brightness / 255 * 100) : 0;
         if (slider) slider.value = val;
-        if (pctEl) pctEl.textContent = pct + '%';
+        if (pctEl) pctEl.textContent = this._fmtPct(val);
       }
 
       // Update on/off highlight
@@ -245,10 +256,8 @@ class UdkDimmerTechCard extends HTMLElement {
     this.shadowRoot.querySelectorAll('.slider').forEach(el => {
       // Live percentage update while dragging
       el.addEventListener('input', e => {
-        const val = parseInt(e.target.value);
-        const pct = Math.round(val / 255 * 100);
         const pctEl = e.target.parentElement.querySelector('.pct');
-        if (pctEl) pctEl.textContent = pct + '%';
+        if (pctEl) pctEl.textContent = self._fmtPct(parseInt(e.target.value));
       });
 
       // Mark as interacting on any touch/mouse
@@ -263,27 +272,47 @@ class UdkDimmerTechCard extends HTMLElement {
 
       // Send command on release, then cooldown before allowing updates
       el.addEventListener('change', e => {
-        const eid = e.target.dataset.eid;
-        const val = parseInt(e.target.value);
+        self._sendValue(e.target.dataset.eid, parseInt(e.target.value));
+      });
+    });
 
-        if (val === 0) {
-          self._hass.callService('light', 'turn_off', { entity_id: eid });
-        } else {
-          self._hass.callService('light', 'turn_on', { entity_id: eid, brightness: val });
-        }
-
-        // Keep blocking updates for this entity for 5s (dimmer transition time)
-        self._interactTimers[eid] = setTimeout(() => {
-          delete self._interactTimers[eid];
-          // Check if any entity is still interacting
-          self._interacting = Object.keys(self._interactTimers).length > 0;
-        }, 5000);
-
-        // Allow other entities to update immediately
-        self._interacting = false;
+    // Fine adjustment via -/+ buttons (single brightness steps)
+    this.shadowRoot.querySelectorAll('.step').forEach(el => {
+      el.addEventListener('click', () => {
+        const eid = el.dataset.eid;
+        const dir = parseInt(el.dataset.dir);
+        const row = el.closest('.dimmer-row');
+        const slider = row.querySelector('.slider');
+        const val = Math.min(255, Math.max(0, parseInt(slider.value) + dir));
+        slider.value = val;
+        const pctEl = row.querySelector('.pct');
+        if (pctEl) pctEl.textContent = self._fmtPct(val);
+        self._sendValue(eid, val);
       });
     });
   }
+
+  _sendValue(eid, val) {
+    if (val === 0) {
+      this._hass.callService('light', 'turn_off', { entity_id: eid });
+    } else {
+      this._hass.callService('light', 'turn_on', { entity_id: eid, brightness: val });
+    }
+
+    // Keep blocking updates for this entity for 5s (dimmer transition time)
+    clearTimeout(this._interactTimers[eid]);
+    this._interactTimers[eid] = setTimeout(() => {
+      delete this._interactTimers[eid];
+      // Check if any entity is still interacting
+      this._interacting = Object.keys(this._interactTimers).length > 0;
+    }, 5000);
+
+    // Allow other entities to update immediately
+    this._interacting = false;
+  }
+
+  /** One decimal so single brightness steps (1/255 ≈ 0.4%) stay visible. */
+  _fmtPct(val) { return (val / 255 * 100).toFixed(1) + '%'; }
 
   _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
   getCardSize() { return 15; }
