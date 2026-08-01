@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import asyncio
 import binascii
+import fcntl
 import logging
+import os
 import time
 from typing import Optional, Tuple
 
@@ -25,6 +27,7 @@ import serial_asyncio
 from homeassistant.components.light import ATTR_BRIGHTNESS, ColorMode, LightEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers import entity_registry as er
 
 from .const import CONF_MODULES, DOMAIN, MOD_ADDRESS, MOD_DIMMERS, MOD_NAME
@@ -34,6 +37,12 @@ _LOGGER = logging.getLogger("custom_components.ha_udk_0410_dimmer")
 
 class Rs485Module:
     """Shared RS485 connection per serial port (with a lock)."""
+
+    # Watchdog: nach so vielen Transaktionen ohne ein einziges empfangenes Byte
+    # wird eine Recovery versucht (erst Port neu öffnen, dann USB-Reset).
+    RECOVERY_AFTER_FAILURES = 8
+    RECOVERY_COOLDOWN_BASE_S = 30.0
+    RECOVERY_COOLDOWN_MAX_S = 600.0
 
     def __init__(
         self,
@@ -45,6 +54,10 @@ class Rs485Module:
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
         self._lock = asyncio.Lock()
+        self._consec_failures = 0
+        self._recovery_attempts = 0
+        self._last_recovery = 0.0
+        self._recovery_cooldown = self.RECOVERY_COOLDOWN_BASE_S
 
     async def connect(self) -> None:
         if self._writer is not None and self._reader is not None:
@@ -56,6 +69,91 @@ class Rs485Module:
         )
         _LOGGER.debug("RS485: Serielle Verbindung zu %s aufgebaut", self.port)
         _LOGGER.info("HA UDK-0410 Dimmer: Verbunden mit %s @ %d baud", self.port, self.baudrate)
+
+    async def close(self) -> None:
+        """Close the serial connection (safe to call when already closed)."""
+        writer = self._writer
+        self._reader = None
+        self._writer = None
+        if writer is None:
+            return
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception as err:
+            _LOGGER.debug("RS485: Fehler beim Schliessen von %s (ignoriert): %s", self.port, err)
+
+    def _note_rx(self) -> None:
+        """Any received byte proves the bus is alive — reset the watchdog."""
+        self._consec_failures = 0
+        self._recovery_attempts = 0
+        self._recovery_cooldown = self.RECOVERY_COOLDOWN_BASE_S
+
+    def _usb_reset_blocking(self) -> str:
+        """Reset the USB device behind the serial port via USBDEVFS_RESET ioctl."""
+        tty_name = os.path.basename(os.path.realpath(self.port))
+        iface_path = os.path.realpath(f"/sys/class/tty/{tty_name}/device")
+        usb_dev_path = os.path.dirname(iface_path)
+        with open(os.path.join(usb_dev_path, "busnum")) as f:
+            busnum = int(f.read().strip())
+        with open(os.path.join(usb_dev_path, "devnum")) as f:
+            devnum = int(f.read().strip())
+        node = f"/dev/bus/usb/{busnum:03d}/{devnum:03d}"
+        fd = os.open(node, os.O_WRONLY)
+        try:
+            fcntl.ioctl(fd, 0x5514, 0)  # USBDEVFS_RESET
+        finally:
+            os.close(fd)
+        return node
+
+    async def _maybe_recover(self) -> None:
+        """Escalating recovery when the bus stays completely silent.
+
+        Attempt 1, 3, 5, …: reopen the serial port.
+        Attempt 2, 4, 6, …: USB-reset the FTDI adapter, then reopen.
+        Backs off exponentially so a legitimately dark bus (modules off)
+        doesn't cause a reset storm.
+        """
+        if self._consec_failures < self.RECOVERY_AFTER_FAILURES:
+            return
+        now = time.monotonic()
+        if now - self._last_recovery < self._recovery_cooldown:
+            return
+
+        async with self._lock:
+            now = time.monotonic()
+            if now - self._last_recovery < self._recovery_cooldown:
+                return
+            self._last_recovery = now
+            self._recovery_attempts += 1
+            self._recovery_cooldown = min(
+                self._recovery_cooldown * 2, self.RECOVERY_COOLDOWN_MAX_S
+            )
+            do_usb_reset = self._recovery_attempts % 2 == 0
+
+            _LOGGER.warning(
+                "RS485: Bus stumm (%d Transaktionen ohne Empfang) — Recovery-Versuch %d: %s",
+                self._consec_failures,
+                self._recovery_attempts,
+                "USB-Reset + Port neu öffnen" if do_usb_reset else "Port neu öffnen",
+            )
+
+            await self.close()
+
+            if do_usb_reset:
+                try:
+                    loop = asyncio.get_running_loop()
+                    node = await loop.run_in_executor(None, self._usb_reset_blocking)
+                    _LOGGER.warning("RS485: USB-Reset von %s ausgeführt", node)
+                    await asyncio.sleep(2.0)
+                except Exception as err:
+                    _LOGGER.warning("RS485: USB-Reset fehlgeschlagen: %s", err)
+
+            try:
+                await self.connect()
+                _LOGGER.warning("RS485: Verbindung neu aufgebaut (%s)", self.port)
+            except Exception as err:
+                _LOGGER.warning("RS485: Neuverbindung fehlgeschlagen: %s", err)
 
     async def _flush_input(self, flush_window_s: float = 0.08) -> bytes:
         """Best-effort flush of stale bytes."""
@@ -70,11 +168,17 @@ class Rs485Module:
                 chunk = await asyncio.wait_for(self._reader.read(1024), timeout=0.01)
             except asyncio.TimeoutError:
                 break
+            except Exception as err:
+                # Device vanished mid-read (e.g. USB reset) — connection is dead
+                _LOGGER.warning("RS485: Fehler beim Flush auf %s: %s", self.port, err)
+                await self.close()
+                break
             if not chunk:
                 break
             flushed.extend(chunk)
 
         if flushed:
+            self._note_rx()
             _LOGGER.debug(
                 "RS485: Flushed %d bytes stale input: %s",
                 len(flushed),
@@ -101,12 +205,21 @@ class Rs485Module:
         only the prefix (e.g. status response: 3-byte prefix, 12-byte total frame).
         """
         if self._writer is None or self._reader is None:
-            _LOGGER.warning("RS485: Verbindung nicht hergestellt (port %s)", self.port)
-            return b"", None
+            try:
+                await self.connect()
+            except Exception as err:
+                _LOGGER.warning("RS485: Verbindung zu %s fehlgeschlagen: %s", self.port, err)
+                self._consec_failures += 1
+                await self._maybe_recover()
+                return b"", None
 
         async with self._lock:
             if flush_before_send:
                 await self._flush_input()
+                if self._writer is None or self._reader is None:
+                    # Flush hat die Verbindung als tot erkannt
+                    self._consec_failures += 1
+                    return b"", None
 
             _LOGGER.debug("RS485: Sende (hex): %s", binascii.hexlify(message).decode())
             try:
@@ -114,6 +227,8 @@ class Rs485Module:
                 await self._writer.drain()
             except Exception as err:
                 _LOGGER.warning("RS485: Fehler beim Schreiben auf %s: %s", self.port, err)
+                await self.close()
+                self._consec_failures += 1
                 return b"", None
 
             buf = bytearray()
@@ -129,9 +244,11 @@ class Rs485Module:
                     continue
                 except Exception as err:
                     _LOGGER.warning("RS485: Fehler beim Lesen auf %s: %s", self.port, err)
+                    await self.close()
                     break
 
                 if chunk:
+                    self._note_rx()
                     buf.extend(chunk)
 
                     if len(buf) > max_buffer:
@@ -172,7 +289,12 @@ class Rs485Module:
                 )
             else:
                 _LOGGER.debug("RS485: Timeout ohne Match. Buffer leer.")
-            return bytes(buf), None
+
+        # Ausserhalb des Locks: stummen Bus zählen und ggf. Recovery anstossen
+        if not buf:
+            self._consec_failures += 1
+            await self._maybe_recover()
+        return bytes(buf), None
 
 
 class Rs485Dimmer(LightEntity):
@@ -515,8 +637,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     module_obj = port_map.get(port_key)
     if module_obj is None:
         module_obj = Rs485Module(port=runtime.port, baudrate=int(runtime.baudrate))
-        await module_obj.connect()
         port_map[port_key] = module_obj
+    try:
+        # Idempotent — baut auch nach einem close() (Reload) neu auf
+        await module_obj.connect()
+    except Exception as err:
+        raise PlatformNotReady(f"Serieller Port {runtime.port} nicht bereit: {err}") from err
 
     ent_reg = er.async_get(hass)
 
@@ -564,6 +690,3 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     _LOGGER.info("HA UDK-0410 Dimmer: %d Light-Entities erstellt", len(entities))
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload entry."""
-    return True

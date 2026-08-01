@@ -123,7 +123,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+        runtime = hass.data[DOMAIN].pop(entry.entry_id, None)
+        # Die gecachte serielle Verbindung schliessen, damit ein Reload wirklich
+        # neu verbindet — sonst redet er weiter mit einem toten File-Descriptor
+        # (z.B. nach USB-Reset oder Re-Enumeration des Adapters).
+        if runtime is not None:
+            port_map = hass.data.get(DOMAIN + "_ports", {})
+            module_obj = port_map.pop(f"{runtime.port}@{runtime.baudrate}", None)
+            if module_obj is not None:
+                await module_obj.close()
         for svc_name in ("update_module", "add_module", "remove_module"):
             hass.services.async_remove(DOMAIN, svc_name)
     return unload_ok
