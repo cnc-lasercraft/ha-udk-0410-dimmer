@@ -21,7 +21,8 @@
         "menu_options": {
           "add_module": "Modul hinzufügen",
           "edit_module": "Modul bearbeiten",
-          "remove_module": "Modul entfernen"
+          "remove_module": "Modul entfernen",
+          "connection": "Verbindung"
         }
       },
       "add_module": {
@@ -55,6 +56,14 @@
         "title": "Modul entfernen",
         "data": {
           "module": "Modul"
+        }
+      },
+      "connection": {
+        "title": "Verbindung",
+        "description": "Serieller Port und Baudrate. Stabilen /dev/serial/by-id/…-Pfad statt /dev/ttyUSB0 bevorzugen.",
+        "data": {
+          "port": "Serieller Port",
+          "baudrate": "Baudrate"
         }
       }
     },

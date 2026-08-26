@@ -71,8 +71,47 @@ class Rs485DimmerOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None) -> FlowResult:
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add_module", "edit_module", "remove_module"],
+            menu_options=["add_module", "edit_module", "remove_module", "connection"],
         )
+
+    # -------- Connection (port/baudrate) --------
+    async def async_step_connection(self, user_input=None) -> FlowResult:
+        entry = self._config_entry
+
+        if user_input is not None:
+            port = user_input[CONF_PORT].strip()
+            baudrate = int(user_input[CONF_BAUDRATE])
+            changed = port != entry.data.get(CONF_PORT) or baudrate != int(
+                entry.data.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)
+            )
+            if port and changed:
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    data={CONF_PORT: port, CONF_BAUDRATE: baudrate},
+                    title=f"HA UDK-0410 Dimmer ({port})",
+                    unique_id=f"{DOMAIN}:{port}",
+                )
+                self.hass.async_create_task(
+                    self.hass.config_entries.async_reload(entry.entry_id)
+                )
+            return self.async_create_entry(title="", data=dict(entry.options))
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_PORT, default=entry.data.get(CONF_PORT, DEFAULT_PORT)
+                ): selector.TextSelector(),
+                vol.Required(
+                    CONF_BAUDRATE,
+                    default=int(entry.data.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1200, max=921600, step=1, mode=selector.NumberSelectorMode.BOX
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="connection", data_schema=schema)
 
     # -------- Add Module --------
     async def async_step_add_module(self, user_input=None) -> FlowResult:

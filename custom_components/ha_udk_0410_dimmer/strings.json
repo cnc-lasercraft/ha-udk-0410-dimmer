@@ -21,7 +21,8 @@
         "menu_options": {
           "add_module": "Add module",
           "edit_module": "Edit module",
-          "remove_module": "Remove module"
+          "remove_module": "Remove module",
+          "connection": "Connection"
         }
       },
       "add_module": {
@@ -55,6 +56,14 @@
         "title": "Remove module",
         "data": {
           "module": "Module"
+        }
+      },
+      "connection": {
+        "title": "Connection",
+        "description": "Serial port and baudrate. Prefer a stable /dev/serial/by-id/... path over /dev/ttyUSB0.",
+        "data": {
+          "port": "Serial port",
+          "baudrate": "Baudrate"
         }
       }
     },
