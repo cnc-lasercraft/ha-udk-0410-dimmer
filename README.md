@@ -1,8 +1,8 @@
 # HA UDK-0410 Dimmer (RS485)
 
-![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange)
+![HACS](https://img.shields.io/badge/HACS-Custom-orange)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-blue)
-![Version](https://img.shields.io/badge/version-1.0.0-green)
+![Version](https://img.shields.io/badge/version-1.2.0-green)
 
 Home Assistant custom integration for the **UDK-0410 RS485 dimmer modules** (4 channels per module).
 
