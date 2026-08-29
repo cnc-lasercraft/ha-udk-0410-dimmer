@@ -8,12 +8,15 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN, CONF_PORT, CONF_BAUDRATE, CONF_MODULES
 
 _LOGGER = logging.getLogger("custom_components.ha_udk_0410_dimmer")
 
 PLATFORMS: list[str] = ["light", "sensor"]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 @dataclass
